@@ -84,6 +84,10 @@
   .fitem .fr{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--teal-deep);font-size:13px;}
   .fitem .fname{font-weight:600;font-size:14px;}
   .fitem .fname span{display:block;font-weight:400;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .fitem .fcite{display:inline-block;margin-top:5px;font-family:"IBM Plex Mono",monospace;
+    font-size:11px;font-weight:400;color:var(--teal);text-decoration:none;}
+  .fitem .fcite:hover{text-decoration:underline;text-underline-offset:2px;}
+  .frame .fnote{font-size:12px;color:var(--ink-soft);margin:0 0 16px;font-style:italic;}
   .fgauge{display:flex;gap:3px;align-items:center;}
   .fgauge i{width:100%;height:16px;background:#D3DBE3;border-radius:2px;}
   .fgauge i.on{background:var(--slate);}
@@ -222,6 +226,7 @@
   <section class="frame" aria-label="RWE evidence-gap framework">
     <h3>The five RWE gaps behind these numbers</h3>
     <p class="fsub">The dashboard shows how much post-approval and observational activity exists. This framework names <em>where</em> that activity is most needed. Severity is a qualitative expert judgment (out of 5), encoded by fill and label — not a measured quantity.</p>
+    <p class="fnote">Each gap is anchored to a representative peer-reviewed source (illustrative, not exhaustive).</p>
     <div id="framework"></div>
   </section>
 
@@ -264,11 +269,16 @@ const SNAPSHOT_DATE = "4 Jul 2026";
 const COND = {"All cancers":"cancer","Breast":"breast cancer","Lung":"lung cancer","Colorectal":"colorectal cancer","Prostate":"prostate cancer"};
 
 const FRAMEWORK = [
-  {r:"01", name:"Accelerated-approval drugs on surrogate endpoints", desc:"confirmatory RWE that surrogate benefit becomes survival benefit", sev:5, lbl:"Critical"},
-  {r:"02", name:"Drugs approved on single-arm trials", desc:"external/synthetic control arms via target-trial emulation", sev:4, lbl:"High"},
-  {r:"03", name:"Checkpoint inhibitors in real-world populations", desc:"effectiveness in older, comorbid, ECOG 2+ patients", sev:4, lbl:"High"},
-  {r:"04", name:"CAR-T and cell therapies", desc:"long-term registries for durability & site-level effectiveness", sev:3, lbl:"Mod–High"},
-  {r:"05", name:"Effectiveness in underrepresented populations", desc:"real-world subgroup effectiveness with structural-determinant adjustment", sev:4, lbl:"High · cross-cutting"}
+  {r:"01", name:"Accelerated-approval drugs on surrogate endpoints", desc:"confirmatory RWE that surrogate benefit becomes survival benefit", sev:5, lbl:"Critical",
+    cite:{ref:"Tibau et al., J Natl Cancer Inst 2025", url:"https://doi.org/10.1093/jnci/djaf195"}},
+  {r:"02", name:"Drugs approved on single-arm trials", desc:"external/synthetic control arms via target-trial emulation", sev:4, lbl:"High",
+    cite:{ref:"Yap et al., Front Oncol 2022", url:"https://doi.org/10.3389/fonc.2021.695936"}},
+  {r:"03", name:"Checkpoint inhibitors in real-world populations", desc:"effectiveness in older, comorbid, ECOG 2+ patients", sev:4, lbl:"High",
+    cite:{ref:"McLean et al., Drugs Aging 2024", url:"https://doi.org/10.1007/s40266-024-01095-z"}},
+  {r:"04", name:"CAR-T and cell therapies", desc:"long-term registries for durability & site-level effectiveness", sev:3, lbl:"Mod–High",
+    cite:{ref:"Landsburg et al., J Immunother Cancer 2025", url:"https://doi.org/10.1136/jitc-2024-009890"}},
+  {r:"05", name:"Effectiveness in underrepresented populations", desc:"real-world subgroup effectiveness with structural-determinant adjustment", sev:4, lbl:"High · cross-cutting",
+    cite:{ref:"Xu et al., Neurooncol Pract 2025", url:"https://doi.org/10.1093/nop/npaf043"}}
 ];
 
 const PALETTE = {teal:"#0E6E68", slate:"#3E5068", amber:"#B5730F", rose:"#9A3B52", faint:"#AEBBC8"};
@@ -384,7 +394,7 @@ function renderFramework(){
     const bars = Array.from({length:5},(_,i)=>`<i class="${i<f.sev?'on':''}"></i>`).join("");
     return `<div class="fitem">
       <div class="fr">${f.r}</div>
-      <div><div class="fname">${f.name}<span>${f.desc}</span></div></div>
+      <div><div class="fname">${f.name}<span>${f.desc}</span><a class="fcite" href="${f.cite.url}" target="_blank" rel="noopener noreferrer">${f.cite.ref} ↗</a></div></div>
       <div class="fgauge" role="img" aria-label="severity ${f.sev} of 5, ${f.lbl}">${bars}<span class="lbl">${f.lbl}</span></div>
     </div>`;
   }).join("");
