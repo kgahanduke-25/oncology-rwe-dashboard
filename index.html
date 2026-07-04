@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oncology RWE Dashboard — ClinicalTrials.gov live</title>
+<meta name="description" content="Interactive dashboard of the oncology clinical-trial landscape from ClinicalTrials.gov, framed around where real-world evidence (RWE) is most needed.">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EBEEF2; --card:#FFFFFF; --ink:#131B25; --ink-soft:#495A6E; --ink-faint:#8090A2;
+    --line:#DBE2E9; --line-soft:#EAEEF2;
+    --teal:#0E6E68; --teal-deep:#0A4F4A; --amber:#B5730F; --slate:#3E5068; --rose:#9A3B52;
+    --focus:#0E6E68; --radius:8px; --gap:18px; --maxw:1240px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"IBM Plex Mono",monospace;font-feature-settings:"tnum" 1;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:22px;}
+  a{color:var(--teal-deep);}
+  button, select{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px;}
+
+  /* header */
+  .head{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:var(--gap);display:flex;flex-wrap:wrap;gap:18px;
+    justify-content:space-between;align-items:flex-end;}
+  .head .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--teal-deep);margin:0 0 8px;}
+  .head h1{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(1.4rem,3vw,2rem);
+    letter-spacing:-.01em;margin:0 0 6px;line-height:1.05;}
+  .head .sub{font-size:13.5px;color:var(--ink-soft);margin:0;max-width:60ch;}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+  .ctl{display:flex;flex-direction:column;gap:4px;}
+  .ctl label{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-faint);}
+  .ctl select{padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:#fff;
+    color:var(--ink);font-size:14px;font-weight:500;min-width:170px;cursor:pointer;}
+  .btn{padding:9px 14px;border:1px solid var(--teal);background:var(--teal);color:#fff;
+    border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;align-self:flex-end;
+    display:inline-flex;align-items:center;gap:7px;transition:background .15s;}
+  .btn:hover{background:var(--teal-deep);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .status{display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;
+    font-size:11px;letter-spacing:.06em;padding:5px 10px;border-radius:20px;border:1px solid var(--line);}
+  .status .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);}
+  .status.live .dot{background:#1a9d5a;box-shadow:0 0 0 3px rgba(26,157,90,.16);}
+  .status.snap .dot{background:var(--amber);}
+  .status.loading .dot{background:var(--teal);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);margin-bottom:var(--gap);}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;border-top:3px solid var(--teal);}
+  .kpi.alt{border-top-color:var(--slate);}
+  .kpi.alt2{border-top-color:var(--amber);}
+  .kpi.alt3{border-top-color:var(--rose);}
+  .kpi .lab{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px;}
+  .kpi .val{font-family:"Fraunces",serif;font-weight:600;font-size:2.3rem;line-height:1;
+    letter-spacing:-.02em;font-feature-settings:"tnum" 1;}
+  .kpi .note{font-size:12px;color:var(--ink-soft);margin-top:9px;line-height:1.4;}
+
+  /* charts */
+  .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;}
+  .card h3{font-size:13px;font-weight:600;margin:0 0 4px;}
+  .card .csub{font-size:11.5px;color:var(--ink-faint);margin:0 0 16px;font-family:"IBM Plex Mono",monospace;}
+  .canvas-box{position:relative;height:280px;}
+  .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+
+  /* framework panel */
+  .frame{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 24px;margin-bottom:var(--gap);}
+  .frame h3{font-family:"Fraunces",serif;font-weight:600;font-size:1.15rem;margin:0 0 4px;}
+  .frame .fsub{font-size:12.5px;color:var(--ink-soft);margin:0 0 18px;max-width:70ch;}
+  .fitem{display:grid;grid-template-columns:30px 1fr 120px;gap:16px;align-items:center;
+    padding:13px 0;border-top:1px solid var(--line-soft);}
+  .fitem .fr{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--teal-deep);font-size:13px;}
+  .fitem .fname{font-weight:600;font-size:14px;}
+  .fitem .fname span{display:block;font-weight:400;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .fgauge{display:flex;gap:3px;align-items:center;}
+  .fgauge i{width:100%;height:16px;background:#D3DBE3;border-radius:2px;}
+  .fgauge i.on{background:var(--slate);}
+  .fgauge .lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-soft);
+    white-space:nowrap;margin-left:8px;}
+
+  /* takeaways */
+  .take{margin-bottom:var(--gap);}
+  .take-head{display:flex;align-items:baseline;gap:12px;margin:0 2px 14px;}
+  .take-head h2{font-family:"Fraunces",serif;font-weight:600;font-size:1.25rem;margin:0;letter-spacing:-.01em;}
+  .take-head .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-faint);}
+  .take-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);}
+  .insight{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;border-left:3px solid var(--rose);}
+  .insight .big{font-family:"Fraunces",serif;font-weight:600;font-size:1.9rem;line-height:1;
+    letter-spacing:-.02em;color:var(--ink);margin-bottom:8px;font-feature-settings:"tnum" 1;}
+  .insight .obs{font-size:13.5px;color:var(--ink);font-weight:600;margin-bottom:9px;line-height:1.35;}
+  .insight .imp{font-size:12.5px;color:var(--ink-soft);line-height:1.5;}
+  .insight .imp b{color:var(--teal-deep);}
+
+  /* contribute */
+  .contrib{background:linear-gradient(180deg,#0E6E68,#0A4F4A);color:#EAF3F2;
+    border-radius:var(--radius);padding:26px 28px;margin-bottom:var(--gap);}
+  .contrib h2{font-family:"Fraunces",serif;font-weight:600;font-size:1.3rem;margin:0 0 4px;color:#fff;letter-spacing:-.01em;}
+  .contrib .csub{font-size:13px;color:#B9D6D3;margin:0 0 20px;max-width:74ch;}
+  .contrib-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .crow{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+    border-radius:6px;padding:16px 18px;}
+  .crow .cmethod{font-weight:600;font-size:14px;color:#fff;margin-bottom:4px;
+    display:flex;align-items:center;gap:9px;}
+  .crow .cmethod .num{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#8FCFC9;
+    border:1px solid rgba(255,255,255,.2);border-radius:3px;padding:1px 6px;}
+  .crow .cwhat{font-size:12.5px;color:#C7DEDB;line-height:1.5;}
+  .crow .cwhat b{color:#EAF3F2;font-weight:600;}
+  @media (max-width:900px){.take-grid{grid-template-columns:1fr;}.contrib-grid{grid-template-columns:1fr;}}
+
+  footer{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);
+    padding:6px 2px 30px;display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;}
+
+  @media (max-width:900px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .charts,.charts-2{grid-template-columns:1fr;}
+    .head{align-items:flex-start;}
+  }
+  @media (max-width:560px){
+    .kpis{grid-template-columns:1fr;}
+    .fitem{grid-template-columns:24px 1fr;}
+    .fgauge{grid-column:1/-1;margin-top:6px;}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <p class="eyebrow">HEOR · Real-World Evidence // oncology trial landscape</p>
+      <h1>Where oncology needs real-world evidence</h1>
+      <p class="sub">Live counts from ClinicalTrials.gov (NIH/NLM), framed around the post-approval and observational activity that RWE is drawn from. Pick a cancer type to re-slice everything.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="cancer">Cancer type</label>
+        <select id="cancer">
+          <option value="All cancers">All cancers</option>
+          <option value="Breast">Breast</option>
+          <option value="Lung">Lung</option>
+          <option value="Colorectal">Colorectal</option>
+          <option value="Prostate">Prostate</option>
+        </select>
+      </div>
+      <button class="btn" id="refresh">↻ Refresh live</button>
+      <span class="status loading" id="status"><span class="dot"></span><span id="status-txt">loading…</span></span>
+    </div>
+  </div>
+
+  <section class="kpis" aria-label="Headline metrics">
+    <div class="kpi">
+      <div class="lab">Total trials</div>
+      <div class="val mono" id="k-total">—</div>
+      <div class="note" id="k-total-note">registered studies</div>
+    </div>
+    <div class="kpi alt">
+      <div class="lab">Observational studies</div>
+      <div class="val mono" id="k-obs">—</div>
+      <div class="note" id="k-obs-note">primary RWE source</div>
+    </div>
+    <div class="kpi alt2">
+      <div class="lab">Phase 4 (post-approval)</div>
+      <div class="val mono" id="k-p4">—</div>
+      <div class="note" id="k-p4-note">confirmatory stage</div>
+    </div>
+    <div class="kpi alt3">
+      <div class="lab">RWE evidence share</div>
+      <div class="val mono" id="k-share">—</div>
+      <div class="note">observational + Phase 4 as % of total — derived indicator</div>
+    </div>
+  </section>
+
+  <section class="charts" aria-label="Primary charts">
+    <div class="card">
+      <h3>Trials by development phase</h3>
+      <p class="csub" id="phase-sub">phase 1 → 4</p>
+      <div class="canvas-box"><canvas id="phaseChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Study-type composition</h3>
+      <p class="csub">interventional vs observational</p>
+      <div class="canvas-box"><canvas id="typeChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="charts-2" aria-label="Secondary charts">
+    <div class="card">
+      <h3>Trials by recruitment status</h3>
+      <p class="csub">recruiting · active · completed</p>
+      <div class="canvas-box"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Late-stage vs early-stage balance</h3>
+      <p class="csub">Phase 1–2 (early) vs Phase 3–4 (late)</p>
+      <div class="canvas-box"><canvas id="stageChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="take" aria-label="Key takeaways">
+    <div class="take-head">
+      <h2>What the numbers actually say</h2>
+      <span class="tag" id="take-scope">all cancers · live</span>
+    </div>
+    <div class="take-grid" id="take-grid"></div>
+  </section>
+
+  <section class="frame" aria-label="RWE evidence-gap framework">
+    <h3>The five RWE gaps behind these numbers</h3>
+    <p class="fsub">The dashboard shows how much post-approval and observational activity exists. This framework names <em>where</em> that activity is most needed. Severity is a qualitative expert judgment (out of 5), encoded by fill and label — not a measured quantity.</p>
+    <div id="framework"></div>
+  </section>
+
+  <section class="contrib" aria-label="Where a cancer epidemiologist contributes">
+    <h2>Where a real-world-evidence cancer epidemiologist contributes</h2>
+    <p class="csub">The asymmetry above is the opening. The trial system is built to <em>approve</em> drugs, not to <em>confirm</em> them in the patients who receive them. Closing that gap is not a trials problem — it's an epidemiology and causal-inference problem. This is where the discipline plugs in.</p>
+    <div class="contrib-grid">
+      <div class="crow">
+        <div class="cmethod"><span class="num">01</span>Build the missing comparator</div>
+        <div class="cwhat">Single-arm and accelerated approvals lack a control. <b>Target-trial emulation and doubly-robust estimation (AIPW)</b> construct external/synthetic control arms from observational data — turning the 21% into causal effect estimates.</div>
+      </div>
+      <div class="crow">
+        <div class="cmethod"><span class="num">02</span>Confirm surrogate → survival</div>
+        <div class="cwhat">Accelerated approvals rest on response rate or PFS. <b>Survival and competing-risks analysis on registry data (e.g. SEER)</b> tests whether that surrogate actually becomes an overall-survival benefit in practice.</div>
+      </div>
+      <div class="crow">
+        <div class="cmethod"><span class="num">03</span>Answer the generalizability question</div>
+        <div class="cwhat">Trials under-enroll older, rural, and minority patients. <b>Structural-determinant methods (ICE, area deprivation) with real-world subgroup effectiveness</b> estimate whether efficacy holds where RCTs are silent.</div>
+      </div>
+      <div class="crow">
+        <div class="cmethod"><span class="num">04</span>Make thin subgroups reliable</div>
+        <div class="cwhat">Real-world subgroup analysis breaks down on small counts. <b>Small-count/suppression-aware estimation and simulation</b> keep effect estimates honest where samples are sparse — the exact failure mode most RWE glosses over.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Data: ClinicalTrials.gov API v2 (NIH/NLM, public domain)</span>
+    <span id="foot-stamp">—</span>
+    <span>Built by Kamalakanta Gahan · v1.0</span>
+  </footer>
+
+</div>
+
+<script>
+// ---------- Embedded fallback snapshot (real counts, retrieved 4 Jul 2026) ----------
+const SNAPSHOT = {"All cancers":{"total":121426,"p1":24817,"p2":39266,"p3":10873,"p4":2566,"interventional":95750,"observational":25251,"recruiting":18742,"completed":52445,"active":7644},"Breast":{"total":16567,"p1":2482,"p2":4517,"p3":1533,"p4":340,"interventional":12923,"observational":3612,"recruiting":2449,"completed":7591,"active":1167},"Lung":{"total":14309,"p1":3129,"p2":5267,"p3":1379,"p4":237,"interventional":11168,"observational":3090,"recruiting":2265,"completed":5648,"active":1029},"Colorectal":{"total":10126,"p1":1748,"p2":2851,"p3":856,"p4":169,"interventional":7705,"observational":2405,"recruiting":1562,"completed":4264,"active":536},"Prostate":{"total":7463,"p1":1370,"p2":2307,"p3":680,"p4":147,"interventional":6017,"observational":1412,"recruiting":1199,"completed":3420,"active":610}};
+const SNAPSHOT_DATE = "4 Jul 2026";
+
+const COND = {"All cancers":"cancer","Breast":"breast cancer","Lung":"lung cancer","Colorectal":"colorectal cancer","Prostate":"prostate cancer"};
+
+const FRAMEWORK = [
+  {r:"01", name:"Accelerated-approval drugs on surrogate endpoints", desc:"confirmatory RWE that surrogate benefit becomes survival benefit", sev:5, lbl:"Critical"},
+  {r:"02", name:"Drugs approved on single-arm trials", desc:"external/synthetic control arms via target-trial emulation", sev:4, lbl:"High"},
+  {r:"03", name:"Checkpoint inhibitors in real-world populations", desc:"effectiveness in older, comorbid, ECOG 2+ patients", sev:4, lbl:"High"},
+  {r:"04", name:"CAR-T and cell therapies", desc:"long-term registries for durability & site-level effectiveness", sev:3, lbl:"Mod–High"},
+  {r:"05", name:"Effectiveness in underrepresented populations", desc:"real-world subgroup effectiveness with structural-determinant adjustment", sev:4, lbl:"High · cross-cutting"}
+];
+
+const PALETTE = {teal:"#0E6E68", slate:"#3E5068", amber:"#B5730F", rose:"#9A3B52", faint:"#AEBBC8"};
+const API = "https://clinicaltrials.gov/api/v2/studies";
+let charts = {};
+
+// ---------- data fetching ----------
+async function apiCount(cond, agg){
+  const p = new URLSearchParams({"query.cond":cond,"countTotal":"true","pageSize":"0"});
+  if(agg) p.set("aggFilters", agg);
+  const res = await fetch(API+"?"+p.toString(), {headers:{Accept:"application/json"}});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  const d = await res.json();
+  return d.totalCount ?? 0;
+}
+
+async function fetchLive(typeName){
+  const cond = COND[typeName];
+  const slices = {
+    total:null, p1:"phase:1", p2:"phase:2", p3:"phase:3", p4:"phase:4",
+    interventional:"studyType:int", observational:"studyType:obs",
+    recruiting:"status:rec", completed:"status:com", active:"status:act"
+  };
+  const keys = Object.keys(slices);
+  const vals = await Promise.all(keys.map(k => apiCount(cond, slices[k])));
+  const out = {}; keys.forEach((k,i)=> out[k]=vals[i]);
+  return out;
+}
+
+// ---------- render ----------
+const fmt = n => (n==null?"—":n.toLocaleString());
+function setStatus(mode, text){
+  const el = document.getElementById("status");
+  el.className = "status "+mode;
+  document.getElementById("status-txt").textContent = text;
+}
+
+function renderKPIs(d, typeName){
+  document.getElementById("k-total").textContent = fmt(d.total);
+  document.getElementById("k-obs").textContent = fmt(d.observational);
+  document.getElementById("k-p4").textContent = fmt(d.p4);
+  const share = d.total ? ((d.observational + d.p4)/d.total*100) : 0;
+  document.getElementById("k-share").textContent = share.toFixed(1)+"%";
+  document.getElementById("k-total-note").textContent = typeName==="All cancers" ? "all registered cancer studies" : typeName.toLowerCase()+" cancer studies";
+  document.getElementById("k-obs-note").textContent = d.total? (d.observational/d.total*100).toFixed(0)+"% of total" : "primary RWE source";
+  document.getElementById("k-p4-note").textContent = d.total? (d.p4/d.total*100).toFixed(1)+"% of total" : "confirmatory stage";
+}
+
+function baseOpts(){
+  return {responsive:true, maintainAspectRatio:false, animation:{duration:300},
+    plugins:{legend:{display:false}, tooltip:{backgroundColor:"#131B25", padding:10,
+      titleFont:{family:"IBM Plex Mono"}, bodyFont:{family:"Inter"},
+      callbacks:{label:c=>" "+c.parsed.y?.toLocaleString?.() ?? c.parsed}}},
+    scales:{y:{beginAtZero:true, grid:{color:"#EAEEF2"}, ticks:{font:{family:"IBM Plex Mono",size:11}, color:"#8090A2"}},
+            x:{grid:{display:false}, ticks:{font:{family:"IBM Plex Mono",size:11}, color:"#495A6E"}}}};
+}
+
+function renderCharts(d){
+  // phase
+  drawBar("phaseChart","phase",["Phase 1","Phase 2","Phase 3","Phase 4"],
+    [d.p1,d.p2,d.p3,d.p4],[PALETTE.faint,PALETTE.faint,PALETTE.slate,PALETTE.amber]);
+  // type doughnut
+  drawDoughnut("typeChart","type",["Interventional","Observational"],
+    [d.interventional,d.observational],[PALETTE.slate,PALETTE.teal]);
+  // status
+  drawBar("statusChart","status",["Recruiting","Active","Completed"],
+    [d.recruiting,d.active,d.completed],[PALETTE.teal,PALETTE.amber,PALETTE.slate]);
+  // early vs late doughnut
+  drawDoughnut("stageChart","stage",["Early (Ph 1–2)","Late (Ph 3–4)"],
+    [d.p1+d.p2,d.p3+d.p4],[PALETTE.faint,PALETTE.rose]);
+}
+
+function drawBar(id,key,labels,data,colors){
+  if(charts[key]){charts[key].data.labels=labels;charts[key].data.datasets[0].data=data;charts[key].update("none");return;}
+  charts[key]=new Chart(document.getElementById(id),{type:"bar",
+    data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:4,maxBarThickness:64}]},
+    options:baseOpts()});
+}
+function drawDoughnut(id,key,labels,data,colors){
+  const opts={responsive:true,maintainAspectRatio:false,cutout:"62%",animation:{duration:300},
+    plugins:{legend:{position:"bottom",labels:{font:{family:"IBM Plex Mono",size:11},color:"#495A6E",padding:14,boxWidth:12}},
+      tooltip:{backgroundColor:"#131B25",padding:10,callbacks:{label:c=>" "+c.label+": "+c.parsed.toLocaleString()}}}};
+  if(charts[key]){charts[key].data.labels=labels;charts[key].data.datasets[0].data=data;charts[key].update("none");return;}
+  charts[key]=new Chart(document.getElementById(id),{type:"doughnut",
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:"#fff"}]},options:opts});
+}
+
+function renderTakeaways(d, typeName){
+  const total = d.total || 1;
+  const p4pct = (d.p4/total*100);
+  const early = d.p1 + d.p2, late = d.p3 + d.p4;
+  const ratio = late ? (early/late) : 0;
+  const obspct = (d.observational/total*100);
+  const label = typeName==="All cancers" ? "cancer" : typeName.toLowerCase()+" cancer";
+  const cards = [
+    { big: p4pct.toFixed(1)+"%",
+      obs: "Post-approval is a rounding error",
+      imp: `Only <b>${p4pct.toFixed(1)}%</b> of ${label} trials are Phase 4. The system is built to get drugs approved, not to confirm they work once they're in use — that confirmation layer is where RWE lives.` },
+    { big: ratio.toFixed(1)+"×",
+      obs: "Early-stage floods, late-stage trickles",
+      imp: `Early-phase trials outnumber late-phase by <b>${ratio.toFixed(1)} to 1</b>. Many drugs enter; far fewer get randomized confirmation — leaving effectiveness in real patients an open question.` },
+    { big: obspct.toFixed(0)+"%",
+      obs: "The RWE-native data is under-used",
+      imp: `<b>${obspct.toFixed(0)}%</b> of ${label} studies are observational — the raw material for RWE exists, but it needs causal method to yield trustworthy effect estimates rather than associations.` }
+  ];
+  document.getElementById("take-grid").innerHTML = cards.map(c=>
+    `<div class="insight"><div class="big mono">${c.big}</div><div class="obs">${c.obs}</div><div class="imp">${c.imp}</div></div>`).join("");
+}
+
+function renderFramework(){
+  const host = document.getElementById("framework");
+  host.innerHTML = FRAMEWORK.map(f=>{
+    const bars = Array.from({length:5},(_,i)=>`<i class="${i<f.sev?'on':''}"></i>`).join("");
+    return `<div class="fitem">
+      <div class="fr">${f.r}</div>
+      <div><div class="fname">${f.name}<span>${f.desc}</span></div></div>
+      <div class="fgauge" role="img" aria-label="severity ${f.sev} of 5, ${f.lbl}">${bars}<span class="lbl">${f.lbl}</span></div>
+    </div>`;
+  }).join("");
+}
+
+// ---------- orchestration ----------
+async function load(typeName, tryLive=true){
+  document.getElementById("refresh").disabled = true;
+  let data, mode, stamp;
+  if(tryLive){
+    setStatus("loading","fetching live…");
+    try{
+      data = await fetchLive(typeName);
+      mode = "live";
+      stamp = "live · " + new Date().toLocaleString();
+      setStatus("live","LIVE · ClinicalTrials.gov");
+    }catch(e){
+      data = SNAPSHOT[typeName]; mode="snap";
+      stamp = "snapshot · "+SNAPSHOT_DATE+" (live fetch blocked)";
+      setStatus("snap","SNAPSHOT · "+SNAPSHOT_DATE);
+    }
+  }else{
+    data = SNAPSHOT[typeName]; mode="snap";
+    stamp = "snapshot · "+SNAPSHOT_DATE;
+    setStatus("snap","SNAPSHOT · "+SNAPSHOT_DATE);
+  }
+  renderKPIs(data, typeName);
+  renderCharts(data);
+  renderTakeaways(data, typeName);
+  document.getElementById("take-scope").textContent = typeName.toLowerCase()+" · "+mode;
+  document.getElementById("phase-sub").textContent = typeName+" · phase 1 → 4";
+  document.getElementById("foot-stamp").textContent = "Data: "+stamp;
+  document.getElementById("refresh").disabled = false;
+}
+
+document.getElementById("cancer").addEventListener("change", e=> load(e.target.value, true));
+document.getElementById("refresh").addEventListener("click", ()=> load(document.getElementById("cancer").value, true));
+
+renderFramework();
+load("All cancers", true);
+</script>
+</body>
+</html>
